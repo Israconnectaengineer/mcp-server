@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  whatsapp-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whatsapp-mcp-server
+    restart: unless-stopped
+
+    ports:
+      - "3002:3000"   # SSE / HTTP — Poke connects to port 3002
+
+    volumes:
+      # WhatsApp session persisted across restarts
+      - whatsapp_session:/app/session
+
+    environment:
+      PORT: "3000"
+      SESSION_PATH: "/app/session"
+      NODE_ENV: "production"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      AI_SYSTEM_PROMPT: "${AI_SYSTEM_PROMPT:-You are a helpful WhatsApp assistant. Reply in the same language the user messages you in. Keep replies concise and friendly.}"
+      # Set these in a .env file or override at deploy time:
+      WEBHOOK_URL: "${WEBHOOK_URL}"        # optional — only needed if forwarding to another service
+      WEBHOOK_SECRET: "${WEBHOOK_SECRET}"  # shared secret — sent as x-webhook-secret header
+
+    # Required for Chromium inside Docker
+    security_opt:
+      - seccomp:unconfined
+    shm_size: "256mb"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  whatsapp_session:
+    driver: local
