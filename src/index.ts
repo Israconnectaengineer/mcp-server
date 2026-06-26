@@ -40,12 +40,12 @@ server.tool(
       .int()
       .min(1)
       .max(100)
-      .default(20)
+      .optional()
       .describe("Maximum number of chats to return (default 20, max 100)"),
   },
   async ({ contact_name, limit }) => {
     try {
-      const chats = await wa.readChats(contact_name, limit);
+      const chats = await wa.readChats(contact_name, limit ?? 20);
       return {
         content: [
           {
