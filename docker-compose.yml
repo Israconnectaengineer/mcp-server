@@ -9,7 +9,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "3002:3000"   # SSE / HTTP — Poke connects to port 3002
+      - "4500:3000"   # External port 4500 maps to internal 3000
 
     volumes:
       # WhatsApp session persisted across restarts
