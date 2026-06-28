@@ -20,146 +20,150 @@ if (!POKE_API_KEY) {
 const wa = new WhatsAppManager(SESSION_PATH);
 
 // ─── MCP Server ─────────────────────────────────────────────────────────────
-const server = new McpServer({
-  name: "whatsapp-mcp-server",
-  version: "1.0.0",
-});
-const registerTool = (server.tool as any).bind(server) as (...args: any[]) => void;
+function createServerWithTools(): McpServer {
+  const server = new McpServer({
+    name: "whatsapp-mcp-server",
+    version: "1.0.0",
+  });
+  const registerTool = (server.tool as any).bind(server) as (...args: any[]) => void;
 
-// Tool: read_chats
-registerTool(
-  "read_chats",
-  "Retrieve recent WhatsApp chats, optionally filtered by contact name",
-  {
-    contact_name: z
-      .string()
-      .optional()
-      .describe("Partial name of the contact/group to filter chats by"),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .optional()
-      .describe("Maximum number of chats to return (default 20, max 100)"),
-  },
-  async ({ contact_name, limit }: { contact_name?: string; limit?: number }) => {
-    try {
-      const chats = await wa.readChats(contact_name, limit ?? 20);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ chats, total: chats.length }, null, 2),
-          },
-        ],
-      };
-    } catch (err) {
-      return {
-        content: [{ type: "text", text: `Error: ${(err as Error).message}` }],
-        isError: true,
-      };
+  // Tool: read_chats
+  registerTool(
+    "read_chats",
+    "Retrieve recent WhatsApp chats, optionally filtered by contact name",
+    {
+      contact_name: z
+        .string()
+        .optional()
+        .describe("Partial name of the contact/group to filter chats by"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe("Maximum number of chats to return (default 20, max 100)"),
+    },
+    async ({ contact_name, limit }: { contact_name?: string; limit?: number }) => {
+      try {
+        const chats = await wa.readChats(contact_name, limit ?? 20);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ chats, total: chats.length }, null, 2),
+            },
+          ],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text", text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
     }
-  }
-);
+  );
 
-// Tool: send_message
-registerTool(
-  "send_message",
-  "Send a WhatsApp message to a contact or group",
-  {
-    recipient_id: z
-      .string()
-      .describe(
-        "Recipient's WhatsApp ID (e.g. 923001234567@c.us) or plain number (e.g. 923001234567)"
-      ),
-    message_body: z.string().describe("Text content of the message to send"),
-  },
-  async ({ recipient_id, message_body }: { recipient_id: string; message_body: string }) => {
-    try {
-      const sent = await wa.sendMessage(recipient_id, message_body);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              { success: true, message: sent },
-              null,
-              2
-            ),
-          },
-        ],
-      };
-    } catch (err) {
-      return {
-        content: [{ type: "text", text: `Error: ${(err as Error).message}` }],
-        isError: true,
-      };
+  // Tool: send_message
+  registerTool(
+    "send_message",
+    "Send a WhatsApp message to a contact or group",
+    {
+      recipient_id: z
+        .string()
+        .describe(
+          "Recipient's WhatsApp ID (e.g. 923001234567@c.us) or plain number (e.g. 923001234567)"
+        ),
+      message_body: z.string().describe("Text content of the message to send"),
+    },
+    async ({ recipient_id, message_body }: { recipient_id: string; message_body: string }) => {
+      try {
+        const sent = await wa.sendMessage(recipient_id, message_body);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                { success: true, message: sent },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text", text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
     }
-  }
-);
+  );
 
-// Tool: search_messages
-registerTool(
-  "search_messages",
-  "Search across WhatsApp messages for a specific keyword or phrase",
-  {
-    query: z
-      .string()
-      .describe("Search term to look for in message bodies"),
-  },
-  async ({ query }: { query: string }) => {
-    try {
-      const messages = await wa.searchMessages(query);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              { messages, total: messages.length },
-              null,
-              2
-            ),
-          },
-        ],
-      };
-    } catch (err) {
-      return {
-        content: [{ type: "text", text: `Error: ${(err as Error).message}` }],
-        isError: true,
-      };
+  // Tool: search_messages
+  registerTool(
+    "search_messages",
+    "Search across WhatsApp messages for a specific keyword or phrase",
+    {
+      query: z
+        .string()
+        .describe("Search term to look for in message bodies"),
+    },
+    async ({ query }: { query: string }) => {
+      try {
+        const messages = await wa.searchMessages(query);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                { messages, total: messages.length },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text", text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
     }
-  }
-);
+  );
 
-// Tool: list_contacts
-registerTool(
-  "list_contacts",
-  "List all WhatsApp contacts with their IDs and display names",
-  {},
-  async () => {
-    try {
-      const contacts = await wa.listContacts();
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              { contacts, total: contacts.length },
-              null,
-              2
-            ),
-          },
-        ],
-      };
-    } catch (err) {
-      return {
-        content: [{ type: "text", text: `Error: ${(err as Error).message}` }],
-        isError: true,
-      };
+  // Tool: list_contacts
+  registerTool(
+    "list_contacts",
+    "List all WhatsApp contacts with their IDs and display names",
+    {},
+    async () => {
+      try {
+        const contacts = await wa.listContacts();
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                { contacts, total: contacts.length },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text", text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
     }
-  }
-);
+  );
+
+  return server;
+}
 
 // ─── Express / SSE transport ─────────────────────────────────────────────────
 const app = express();
@@ -304,10 +308,10 @@ app.post("/send-message", async (req: Request, res: Response) => {
 
 // SSE transport — Poke registers this URL
 const transports: Map<string, SSEServerTransport> = new Map();
-let hasActiveMcpTransport = false;
+const sessionServers: Map<string, McpServer> = new Map();
 
 app.get("/sse", async (req: Request, res: Response) => {
-  if (hasActiveMcpTransport) {
+  if (transports.size > 0) {
     console.warn("⚠️ Existing MCP SSE transport detected — rotating to new connection");
     for (const [sessionId, existingTransport] of transports.entries()) {
       try {
@@ -316,14 +320,15 @@ app.get("/sse", async (req: Request, res: Response) => {
         // best-effort close
       }
       transports.delete(sessionId);
+      sessionServers.delete(sessionId);
     }
-    hasActiveMcpTransport = false;
   }
 
   console.log("📡 SSE connection established from", req.ip);
+  const server = createServerWithTools();
   const transport = new SSEServerTransport("/messages", res);
   transports.set(transport.sessionId, transport);
-  hasActiveMcpTransport = true;
+  sessionServers.set(transport.sessionId, server);
 
   // Keep-alive comments help some validators/proxies maintain SSE streams.
   // This is safe for SSE clients and ignored by MCP message parsers.
@@ -344,7 +349,7 @@ app.get("/sse", async (req: Request, res: Response) => {
     console.log("📡 SSE connection closed:", transport.sessionId);
     clearInterval(heartbeat);
     transports.delete(transport.sessionId);
-    hasActiveMcpTransport = false;
+    sessionServers.delete(transport.sessionId);
   });
 
   try {
@@ -353,7 +358,7 @@ app.get("/sse", async (req: Request, res: Response) => {
     console.error("❌ SSE connect error:", (err as Error).message);
     clearInterval(heartbeat);
     transports.delete(transport.sessionId);
-    hasActiveMcpTransport = false;
+    sessionServers.delete(transport.sessionId);
     if (!res.headersSent) {
       res.status(500).json({ error: "Failed to connect MCP transport" });
     } else {
