@@ -311,19 +311,6 @@ const transports: Map<string, SSEServerTransport> = new Map();
 const sessionServers: Map<string, McpServer> = new Map();
 
 app.get("/sse", async (req: Request, res: Response) => {
-  if (transports.size > 0) {
-    console.warn("⚠️ Existing MCP SSE transport detected — rotating to new connection");
-    for (const [sessionId, existingTransport] of transports.entries()) {
-      try {
-        (existingTransport as any).close?.();
-      } catch {
-        // best-effort close
-      }
-      transports.delete(sessionId);
-      sessionServers.delete(sessionId);
-    }
-  }
-
   console.log("📡 SSE connection established from", req.ip);
   const server = createServerWithTools();
   const transport = new SSEServerTransport("/messages", res);
@@ -362,8 +349,14 @@ app.get("/sse", async (req: Request, res: Response) => {
 });
 
 app.post("/messages", async (req: Request, res: Response) => {
-  const sessionId = req.query.sessionId as string;
-  const transport = transports.get(sessionId);
+  const sessionId = req.query.sessionId as string | undefined;
+  const resolvedSessionId = sessionId
+    ?? (transports.size === 1 ? Array.from(transports.keys())[0] : undefined);
+  if (!resolvedSessionId) {
+    res.status(400).json({ error: "sessionId is required" });
+    return;
+  }
+  const transport = transports.get(resolvedSessionId);
   if (!transport) {
     res.status(404).json({ error: "Session not found" });
     return;
