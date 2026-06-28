@@ -329,34 +329,28 @@ app.get("/sse", async (req: Request, res: Response) => {
   const transport = new SSEServerTransport("/messages", res);
   transports.set(transport.sessionId, transport);
   sessionServers.set(transport.sessionId, server);
-
-  // Keep-alive comments help some validators/proxies maintain SSE streams.
-  // This is safe for SSE clients and ignored by MCP message parsers.
-  try {
-    res.write(": connected\n\n");
-  } catch {
-    // best-effort heartbeat
-  }
-  const heartbeat = setInterval(() => {
-    try {
-      res.write(": ping\n\n");
-    } catch {
-      // ignore write errors; close handler will clean up
-    }
-  }, 15000);
+  let heartbeat: NodeJS.Timeout | null = null;
 
   res.on("close", () => {
     console.log("📡 SSE connection closed:", transport.sessionId);
-    clearInterval(heartbeat);
+    if (heartbeat) clearInterval(heartbeat);
     transports.delete(transport.sessionId);
     sessionServers.delete(transport.sessionId);
   });
 
   try {
     await server.connect(transport);
+    // Start keep-alive only after SSE headers are set by transport/server.
+    heartbeat = setInterval(() => {
+      try {
+        res.write(": ping\n\n");
+      } catch {
+        // ignore write errors; close handler will clean up
+      }
+    }, 15000);
   } catch (err) {
     console.error("❌ SSE connect error:", (err as Error).message);
-    clearInterval(heartbeat);
+    if (heartbeat) clearInterval(heartbeat);
     transports.delete(transport.sessionId);
     sessionServers.delete(transport.sessionId);
     if (!res.headersSent) {
