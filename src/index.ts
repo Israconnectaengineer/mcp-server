@@ -325,8 +325,24 @@ app.get("/sse", async (req: Request, res: Response) => {
   transports.set(transport.sessionId, transport);
   hasActiveMcpTransport = true;
 
+  // Keep-alive comments help some validators/proxies maintain SSE streams.
+  // This is safe for SSE clients and ignored by MCP message parsers.
+  try {
+    res.write(": connected\n\n");
+  } catch {
+    // best-effort heartbeat
+  }
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(": ping\n\n");
+    } catch {
+      // ignore write errors; close handler will clean up
+    }
+  }, 15000);
+
   res.on("close", () => {
     console.log("📡 SSE connection closed:", transport.sessionId);
+    clearInterval(heartbeat);
     transports.delete(transport.sessionId);
     hasActiveMcpTransport = false;
   });
@@ -335,6 +351,7 @@ app.get("/sse", async (req: Request, res: Response) => {
     await server.connect(transport);
   } catch (err) {
     console.error("❌ SSE connect error:", (err as Error).message);
+    clearInterval(heartbeat);
     transports.delete(transport.sessionId);
     hasActiveMcpTransport = false;
     if (!res.headersSent) {
