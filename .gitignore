@@ -5,4 +5,3 @@ dist/
 .vscode/
 session/
 mcp-server-update.zip
-.env
