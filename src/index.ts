@@ -308,8 +308,16 @@ let hasActiveMcpTransport = false;
 
 app.get("/sse", async (req: Request, res: Response) => {
   if (hasActiveMcpTransport) {
-    res.status(409).json({ error: "MCP SSE transport already connected" });
-    return;
+    console.warn("⚠️ Existing MCP SSE transport detected — rotating to new connection");
+    for (const [sessionId, existingTransport] of transports.entries()) {
+      try {
+        (existingTransport as any).close?.();
+      } catch {
+        // best-effort close
+      }
+      transports.delete(sessionId);
+    }
+    hasActiveMcpTransport = false;
   }
 
   console.log("📡 SSE connection established from", req.ip);
