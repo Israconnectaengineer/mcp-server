@@ -1,6 +1,8 @@
 import { Client, LocalAuth, Message, Chat, Contact } from "whatsapp-web.js";
 import qrcode from "qrcode-terminal";
 import { EventEmitter } from "events";
+import { readdir, rm } from "fs/promises";
+import path from "path";
 
 export interface ChatInfo {
   id: string;
@@ -110,7 +112,42 @@ export class WhatsAppManager extends EventEmitter {
 
   async initialize(): Promise<void> {
     console.log("🚀 Initializing WhatsApp client...");
+    await this.cleanupStaleChromiumLocks();
     await this.client.initialize();
+  }
+
+  private async cleanupStaleChromiumLocks(): Promise<void> {
+    const lockNames = new Set(["SingletonLock", "SingletonCookie", "SingletonSocket"]);
+
+    const walkAndClean = async (dir: string): Promise<void> => {
+      let entries: Array<{ name: string; isDirectory: () => boolean }> = [];
+      try {
+        entries = await readdir(dir, { withFileTypes: true, encoding: "utf8" });
+      } catch {
+        return;
+      }
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+
+        if (entry.isDirectory()) {
+          await walkAndClean(fullPath);
+          continue;
+        }
+
+        if (lockNames.has(entry.name)) {
+          try {
+            // Remove file/symlink/socket lock artifacts left by crashed Chromium.
+            await rm(fullPath, { force: true, recursive: false });
+            console.log(`🧹 Removed stale Chromium lock: ${fullPath}`);
+          } catch {
+            // Ignore cleanup failures; Chromium launch will report if lock persists.
+          }
+        }
+      }
+    };
+
+    await walkAndClean(this.sessionPath);
   }
 
   getQRCode(): string | null {

@@ -19,8 +19,8 @@ services:
       PORT: "3000"
       SESSION_PATH: "/app/session"
       NODE_ENV: "production"
-      OPENAI_API_KEY: "${OPENAI_API_KEY}"
-      AI_SYSTEM_PROMPT: "${AI_SYSTEM_PROMPT:-You are a helpful WhatsApp assistant. Reply in the same language the user messages you in. Keep replies concise and friendly.}"
+      POKE_API_KEY: "${POKE_API_KEY}"
+      POKE_API_URL: "${POKE_API_URL:-https://poke.com/api/v1/inbound/api-message}"
       # Set these in a .env file or override at deploy time:
       WEBHOOK_URL: "${WEBHOOK_URL}"        # optional — only needed if forwarding to another service
       WEBHOOK_SECRET: "${WEBHOOK_SECRET}"  # shared secret — sent as x-webhook-secret header
