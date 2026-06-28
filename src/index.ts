@@ -78,7 +78,9 @@ function createServerWithTools(): McpServer {
     },
     async ({ recipient_id, message_body }: { recipient_id: string; message_body: string }) => {
       try {
+        console.log(`🛠️ MCP tool send_message invoked for ${recipient_id}`);
         const sent = await wa.sendMessage(recipient_id, message_body);
+        console.log(`✅ MCP tool send_message sent: ${sent.id}`);
         return {
           content: [
             {
@@ -92,6 +94,7 @@ function createServerWithTools(): McpServer {
           ],
         };
       } catch (err) {
+        console.error(`❌ MCP tool send_message failed: ${(err as Error).message}`);
         return {
           content: [{ type: "text", text: `Error: ${(err as Error).message}` }],
           isError: true,
@@ -286,18 +289,24 @@ app.post("/send-message", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const { recipient_id, message_body } = req.body as {
+  const { recipient_id, message_body, to, message } = req.body as {
     recipient_id?: string;
     message_body?: string;
+    to?: string;
+    message?: string;
   };
-  if (!recipient_id || !message_body) {
+  // Support both MCP tool payload and webhook/script payload naming.
+  const resolvedRecipient = recipient_id ?? to;
+  const resolvedMessage = message_body ?? message;
+
+  if (!resolvedRecipient || !resolvedMessage) {
     console.warn("⛔ /send-message missing fields — got:", req.body);
-    res.status(400).json({ error: "recipient_id and message_body are required" });
+    res.status(400).json({ error: "recipient_id/message_body (or to/message) are required" });
     return;
   }
   try {
-    console.log(`📤 Sending to ${recipient_id}: "${message_body.slice(0, 60)}..."`)
-    const sent = await wa.sendMessage(recipient_id, message_body);
+    console.log(`📤 Sending to ${resolvedRecipient}: "${resolvedMessage.slice(0, 60)}..."`)
+    const sent = await wa.sendMessage(resolvedRecipient, resolvedMessage);
     console.log("✅ Message sent:", sent.id);
     res.json({ success: true, message: sent });
   } catch (err) {
@@ -311,6 +320,19 @@ const transports: Map<string, SSEServerTransport> = new Map();
 const sessionServers: Map<string, McpServer> = new Map();
 
 app.get("/sse", async (req: Request, res: Response) => {
+  if (transports.size > 0) {
+    console.warn("⚠️ Existing MCP SSE transport detected — rotating to new connection");
+    for (const [sessionId, existingTransport] of transports.entries()) {
+      try {
+        (existingTransport as any).close?.();
+      } catch {
+        // best-effort close
+      }
+      transports.delete(sessionId);
+      sessionServers.delete(sessionId);
+    }
+  }
+
   console.log("📡 SSE connection established from", req.ip);
   const server = createServerWithTools();
   const transport = new SSEServerTransport("/messages", res);
@@ -349,14 +371,14 @@ app.get("/sse", async (req: Request, res: Response) => {
 });
 
 app.post("/messages", async (req: Request, res: Response) => {
-  const sessionId = req.query.sessionId as string | undefined;
-  const resolvedSessionId = sessionId
-    ?? (transports.size === 1 ? Array.from(transports.keys())[0] : undefined);
-  if (!resolvedSessionId) {
-    res.status(400).json({ error: "sessionId is required" });
-    return;
+  const sessionId = req.query.sessionId as string;
+  const transport = transports.get(sessionId);
+  const method = (req.body as any)?.method;
+  if (method) {
+    console.log(`📨 MCP /messages method=${String(method)} session=${sessionId}`);
+  } else {
+    console.log(`📨 MCP /messages session=${sessionId}`);
   }
-  const transport = transports.get(resolvedSessionId);
   if (!transport) {
     res.status(404).json({ error: "Session not found" });
     return;
